@@ -1,0 +1,669 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+## SETUP
+
+```{r}
+
+library(haven)
+library(tidyverse)
+library(janitor)
+library(finalfit)
+library(patchwork)
+
+library(broom)
+library(fixest)
+library(sandwich)
+library(writexl)
+
+widefilefilters <- read_dta("S:\\Project\\HealthierWomen\\Sage\\widefilefilters.dta") %>% select(-FAAR_1)
+education <- read_sav("S:\\Project\\HealthierWomen\\Sage\\MFR_SIBS_19_08_21_v5_edu.sav") %>% filter(!is.na(mor_lnr))
+dat <- read_dta("S:\\Project\\HealthierWomen\\Sage\\paper3vars_24_06_18.dta")
+bmistuff <- read_dta("S:\\Project\\HealthierWomen\\Sage\\MFR_SIBS_19_08_21_v5_bmistuff.dta") %>% filter(!is.na(mor_lnr))
+
+
+
+dat <- left_join(dat, bmistuff, by = c("MOR_lnr_" = "mor_lnr"))
+
+dat <- left_join(dat, education, by = c("MOR_lnr_" = "mor_lnr"))
+
+dat <- left_join(dat, widefilefilters, by = c("MOR_lnr_" = "mor_lnr"))
+
+
+dat <- dat %>% filter(PARITET_MOR_1 == 0) %>%
+               filter(SINGLE_selection == 1) %>% 
+               filter(FAAR_1 >= 1999) %>% 
+               filter(antall < 5) 
+
+
+dat1 <- dat %>% filter(antall == 1)
+dat2 <- dat %>% filter(antall == 2)
+dat3 <- dat %>% filter(antall == 3)
+dat4 <- dat %>% filter(antall == 4)
+
+dat1 <- dat1 %>% filter(!is.na(DIABETES_SVSK_1))
+dat2 <- dat2 %>% filter(antall == 2) %>% filter(!is.na(DIABETES_SVSK_1)) %>% filter(!is.na(DIABETES_SVSK_2))
+dat3 <- dat3 %>% filter(antall == 3) %>% filter(!is.na(DIABETES_SVSK_1)) %>% filter(!is.na(DIABETES_SVSK_2)) %>% filter(!is.na(DIABETES_SVSK_3))
+dat4 <- dat4 %>% filter(antall == 4) %>% filter(!is.na(DIABETES_SVSK_1)) %>% filter(!is.na(DIABETES_SVSK_2)) %>% filter(!is.na(DIABETES_SVSK_3)) %>% filter(!is.na(DIABETES_SVSK_4))
+
+dat <- bind_rows(dat1, dat2, dat3, dat4)
+
+
+variable.names(dat)
+
+rm(widefilefilters, education, bmistuff)
+gc()
+
+```
+
+Varibales in final "dat" dataset:
+
+"MOR_lnr_"               "antall_1"               "BARN_lnr_1"             "MORS_ALDER_1"           "HYPERTENSJON_ALENE_1"   "FAAR_1"                
+"SVLEN_RS_1"             "preecxx_1"              "DIABETES_SVSK_1"        "antall_2"               "BARN_lnr_2"             "MORS_ALDER_2"          
+"HYPERTENSJON_ALENE_2"   "FAAR_2"                 "SVLEN_RS_2"             "preecxx_2"              "DIABETES_SVSK_2"        "antall_3"              
+"BARN_lnr_3"             "MORS_ALDER_3"           "HYPERTENSJON_ALENE_3"   "FAAR_3"                 "SVLEN_RS_3"             "preecxx_3"             
+"DIABETES_SVSK_3"        "antall_4"               "BARN_lnr_4"             "MORS_ALDER_4"           "HYPERTENSJON_ALENE_4"   "FAAR_4"                
+"SVLEN_RS_4"             "preecxx_4"              "DIABETES_SVSK_4"        "KMI_FOER_1"             "MUTD3C"                 "MUTD2CX"               
+"antall"                 "PARITET_MOR_1"          "PDOD_selection"         "SINGLE_selection"       "newprx_1"               "newprx_2"              
+"newprx_3"               "newprx_4"               "newprx_after_1st"       "DIABETES_SVSK_after1st" "aldercat"               "prx_gdm_1"             
+"prx_gdm_2"              "prx_gdm_3"              "prx_gdm_4"              "prxgdm_after1st"        "bmimiss"                "comb_1"                
+"ant2c"                  "both"                   "gdmafter"               "prxafter"               "frh" "both_1"                 "both_after"    
+
+```{r}
+
+dat$HYPERTENSJON_ALENE_1 <- ifelse(is.na(dat$HYPERTENSJON_ALENE_1), 0, dat$HYPERTENSJON_ALENE_1)
+dat$HYPERTENSJON_ALENE_2 <- ifelse(is.na(dat$HYPERTENSJON_ALENE_2), 0, dat$HYPERTENSJON_ALENE_2)
+dat$HYPERTENSJON_ALENE_3 <- ifelse(is.na(dat$HYPERTENSJON_ALENE_3), 0, dat$HYPERTENSJON_ALENE_3)
+dat$HYPERTENSJON_ALENE_4 <- ifelse(is.na(dat$HYPERTENSJON_ALENE_4), 0, dat$HYPERTENSJON_ALENE_4)
+
+dat$newprx_1 <- ifelse(dat$HYPERTENSJON_ALENE_1 == 1 | dat$preecxx_1 == 1, 1, 0)
+dat$newprx_2 <- ifelse(dat$HYPERTENSJON_ALENE_2 == 1 | dat$preecxx_2 == 1, 1, 0)
+dat$newprx_3 <- ifelse(dat$HYPERTENSJON_ALENE_3 == 1 | dat$preecxx_3 == 1, 1, 0)
+dat$newprx_4 <- ifelse(dat$HYPERTENSJON_ALENE_4 == 1 | dat$preecxx_4 == 1, 1, 0)
+
+dat$newprx_1 <- ifelse(is.na(dat$newprx_1), 0, dat$newprx_1)
+dat$newprx_2 <- ifelse(is.na(dat$newprx_2), 0, dat$newprx_2)
+dat$newprx_3 <- ifelse(is.na(dat$newprx_3), 0, dat$newprx_3)
+dat$newprx_4 <- ifelse(is.na(dat$newprx_4), 0, dat$newprx_4)
+
+dat$newprx_after_1st <- ifelse(dat$newprx_1 == 1 | dat$newprx_2 == 1 | dat$newprx_3 == 1 | dat$newprx_4 == 1, 1, 0)
+dat$newprx_after_1st <- ifelse(is.na(dat$newprx_after_1st), 0, dat$newprx_after_1st)
+
+dat$DIABETES_SVSK_after1st <- ifelse(dat$DIABETES_SVSK_1 == 1 | dat$DIABETES_SVSK_2 == 1 | dat$DIABETES_SVSK_3 == 1 | dat$DIABETES_SVSK_4 == 1, 1, 0)
+dat$DIABETES_SVSK_after1st <- ifelse(is.na(dat$DIABETES_SVSK_after1st), 0, dat$DIABETES_SVSK_after1st)
+
+dat$aldercat <- cut(dat$MORS_ALDER_1, breaks = c(0, 25, 30, 35, 40, 99))
+
+dat$MUTD3C <- ifelse(is.na(dat$MUTD3C), 4, dat$MUTD3C)
+
+dat$prx_gdm_1 <- ifelse(dat$newprx_1 == 1 & dat$DIABETES_SVSK_1 == 1, 1, 0)
+dat$prx_gdm_2 <- ifelse(dat$newprx_2 == 1 & dat$DIABETES_SVSK_2 == 1, 1, 0)
+dat$prx_gdm_3 <- ifelse(dat$newprx_3 == 1 & dat$DIABETES_SVSK_3 == 1, 1, 0)
+dat$prx_gdm_4 <- ifelse(dat$newprx_4 == 1 & dat$DIABETES_SVSK_4 == 1, 1, 0)
+
+dat$prxgdm_after1st <- ifelse(dat$prx_gdm_2 == 1 | dat$prx_gdm_3 == 1 | dat$prx_gdm_4 == 1, 1, 0)
+dat$prxgdm_after1st <- ifelse(is.na(dat$prxgdm_after1st), 0, dat$prxgdm_after1st)
+
+```
+
+```{r}
+
+function1 <- function(dat2) {
+
+  d1 <- dat2 %>% tabyl(newprx_1) %>% mutate(birthorder = 1) %>% filter(newprx_1 == 1) %>% mutate(valid_percent = percent) %>% select(-newprx_1)
+  d2 <- dat2 %>% tabyl(newprx_2) %>% mutate(birthorder = 2) %>% filter(newprx_2 == 1) %>% mutate(valid_percent = percent) %>% select(-newprx_2, -valid_percent)
+  d3 <- dat2 %>% tabyl(newprx_3) %>% mutate(birthorder = 3) %>% filter(newprx_3 == 1) %>% mutate(valid_percent = percent) %>% select(-newprx_3, -valid_percent)
+  d4 <- dat2 %>% tabyl(newprx_4) %>% mutate(birthorder = 4) %>% filter(newprx_4 == 1) %>% mutate(valid_percent = percent) %>% select(-newprx_4, -valid_percent)
+ 
+
+  dall <- bind_rows(d1, d2, d3, d4) %>% mutate(id = "HDP")
+
+  
+  e1 <- dat2 %>% tabyl(DIABETES_SVSK_1) %>% mutate(birthorder = 1) %>% filter(DIABETES_SVSK_1 == 1) %>% mutate(valid_percent = percent) %>% select(-DIABETES_SVSK_1, -valid_percent) 
+  e2 <- dat2 %>% tabyl(DIABETES_SVSK_2) %>% mutate(birthorder = 2) %>% filter(DIABETES_SVSK_2 == 1) %>% mutate(valid_percent = percent) %>% select(-DIABETES_SVSK_2, -valid_percent)
+  e3 <- dat2 %>% tabyl(DIABETES_SVSK_3) %>% mutate(birthorder = 3) %>% filter(DIABETES_SVSK_3 == 1) %>% mutate(valid_percent = percent) %>% select(-DIABETES_SVSK_3, -valid_percent)
+  e4 <- dat2 %>% tabyl(DIABETES_SVSK_4) %>% mutate(birthorder = 4) %>% filter(DIABETES_SVSK_4 == 1) %>% mutate(valid_percent = percent) %>% select(-DIABETES_SVSK_4, -valid_percent)
+ 
+  
+  eall <- bind_rows(e1, e2, e3, e4) %>% mutate(id = "GDM")
+
+  bind_rows(dall, eall) %>% mutate(percent = round(percent,5)*100)
+  
+}
+
+```
+
+```{r}
+dat %>% tabyl(preecxx_1)
+dat %>% tabyl(HYPERTENSJON_ALENE_1)
+dat %>% tabyl(newprx_1)
+dat %>% tabyl(DIABETES_SVSK_1)
+
+dat %>% filter(antall >= 2) %>% tabyl(preecxx_2)
+dat %>% filter(antall >= 2) %>% tabyl(HYPERTENSJON_ALENE_2)
+dat %>% filter(antall >= 2) %>% tabyl(newprx_2)
+dat %>% filter(antall >= 2) %>% tabyl(DIABETES_SVSK_2)
+
+dat %>% filter(antall >= 3) %>% tabyl(preecxx_3)
+dat %>% filter(antall >= 3) %>% tabyl(HYPERTENSJON_ALENE_3)
+dat %>% filter(antall >= 3) %>% tabyl(newprx_3)
+dat %>% filter(antall >= 3) %>% tabyl(DIABETES_SVSK_3)
+
+dat %>% filter(antall >= 4) %>% tabyl(preecxx_4)
+dat %>% filter(antall >= 4) %>% tabyl(HYPERTENSJON_ALENE_4)
+dat %>% filter(antall >= 4) %>% tabyl(newprx_4)
+dat %>% filter(antall >= 4) %>% tabyl(DIABETES_SVSK_4)
+
+dat %>% filter(FAAR_1 > 2009) %>% mutate(missing = if_else(is.na(KMI_FOER_1),1,0)) %>% tabyl(missing)
+
+dat %>% tabyl(MUTD3C)
+
+###
+
+dat %>% tabyl(DIABETES_SVSK_1)
+dat %>% filter(antall >= 2) %>% tabyl(DIABETES_SVSK_2)
+dat %>% filter(antall >= 3) %>% tabyl(DIABETES_SVSK_3)
+dat %>% filter(antall >= 4) %>% tabyl(DIABETES_SVSK_4)
+
+### help!
+
+dat %>% filter(antall >= 1) %>% mutate(missing = if_else(is.na(MORS_ALDER_1),1,0)) %>% tabyl(missing)
+dat %>% filter(antall >= 2) %>% mutate(missing = if_else(is.na(MORS_ALDER_2),1,0)) %>% tabyl(missing)
+dat %>% filter(antall >= 3) %>% mutate(missing = if_else(is.na(MORS_ALDER_3),1,0)) %>% tabyl(missing)
+dat %>% filter(antall >= 4) %>% mutate(missing = if_else(is.na(MORS_ALDER_4),1,0)) %>% tabyl(missing)
+
+dat %>% filter(antall >= 1) %>% mutate(missing = if_else(is.na(FAAR_1),1,0)) %>% tabyl(missing)
+dat %>% filter(antall >= 2) %>% mutate(missing = if_else(is.na(FAAR_2),1,0)) %>% tabyl(missing)
+dat %>% filter(antall >= 3) %>% mutate(missing = if_else(is.na(FAAR_3),1,0)) %>% tabyl(missing)
+dat %>% filter(antall >= 4) %>% mutate(missing = if_else(is.na(FAAR_4),1,0)) %>% tabyl(missing)
+
+justgdm1 <- dat %>% select(MOR_lnr_, antall, DIABETES_SVSK_1) %>% mutate(complete1 = complete.cases(.)) %>% select(MOR_lnr_, complete1)
+justgdm2 <- dat %>% select(MOR_lnr_, antall, DIABETES_SVSK_2) %>% filter(antall >= 2) %>% mutate(complete2 = complete.cases(.)) %>% select(MOR_lnr_, complete2)
+justgdm3 <- dat %>% select(MOR_lnr_, antall, DIABETES_SVSK_3) %>% filter(antall >= 3) %>% mutate(complete3 = complete.cases(.)) %>% select(MOR_lnr_, complete3)
+justgdm4 <- dat %>% select(MOR_lnr_, antall, DIABETES_SVSK_4) %>% filter(antall >= 4) %>% mutate(complete4 = complete.cases(.)) %>% select(MOR_lnr_, complete4)
+
+allgdm <- justgdm1 %>% full_join(justgdm2, by = "MOR_lnr_") %>% full_join(justgdm3, by = "MOR_lnr_") %>% full_join(justgdm4, by = "MOR_lnr_")
+
+allgdm$missing <- ifelse(allgdm$complete1 == F | allgdm$complete2 == F | allgdm$complete3 == F | allgdm$complete4 == F, "missing", "not missing")
+allgdm$missing <- ifelse(is.na(allgdm$missing), "not missing", allgdm$missing)
+
+allgdm %>% tabyl(missing)
+
+
+```
+
+### TABLE 1
+
+```{r}
+
+### main table
+
+dat %>% tabyl(newprx_1, DIABETES_SVSK_1) 
+dat %>% tabyl(newprx_1, DIABETES_SVSK_1) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+dat09 <- filter(dat, FAAR_1 < 2010)
+dat19 <- filter(dat, FAAR_1 >= 2010)
+
+n09 <- dat09 %>% tabyl(newprx_1, DIABETES_SVSK_1) 
+p09 <- dat09 %>% tabyl(newprx_1, DIABETES_SVSK_1) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+t09 <- data.frame(N = str_c(n09[,2], " (", p09[,2], ")"))
+s09 <- data.frame(N = str_c(n09[,3], " (", p09[,3], ")"))
+
+r09 <- bind_cols(t09, s09)
+
+n19 <- dat19 %>% tabyl(newprx_1, DIABETES_SVSK_1) 
+p19 <- dat19 %>% tabyl(newprx_1, DIABETES_SVSK_1) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+t19 <- data.frame(N = str_c(n19[,2], " (", p19[,2], ")"))
+s19 <- data.frame(N = str_c(n19[,3], " (", p19[,3], ")"))
+
+r19 <- bind_cols(t19, s19)
+
+table1PERC <- bind_rows(r09, r19)
+
+```
+
+```{r}
+
+dat09$DIABETES_SVSK_1 <- as.numeric(dat09$DIABETES_SVSK_1)
+dat09$newprx_1 <- as.numeric(dat09$newprx_1)
+
+model <- glm(DIABETES_SVSK_1 ~ newprx_1,
+             family = binomial(link = "logit"),
+             data = dat09)
+um09 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(DIABETES_SVSK_1 ~ newprx_1,
+             family = binomial(link = "logit"),
+             data = dat19)
+um19 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(DIABETES_SVSK_1 ~ newprx_1 + aldercat + FAAR_1 + MUTD3C,
+             family = binomial(link = "logit"),
+             data = dat09)
+am09 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(DIABETES_SVSK_1 ~ newprx_1 + aldercat + FAAR_1 + MUTD3C,
+             family = binomial(link = "logit"),
+             data = dat19)
+am19 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(DIABETES_SVSK_1 ~ newprx_1 + aldercat + FAAR_1 + MUTD3C + as.numeric(KMI_FOER_1),
+             family = binomial(link = "logit"),
+             data = dat19)
+bm19 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_all(round, digits = 2)
+
+ums <- bind_rows(um09, um19) %>% mutate(Unadjusted = str_c(estimate, " (", conf.low, ", ", conf.high, ")")) %>% select(Unadjusted) %>% add_row(Unadjusted = "Reference", .before = 1) %>% add_row(Unadjusted = "Reference", .before = 3)
+
+ams <- bind_rows(am09, am19) %>% mutate(Adjusted = str_c(estimate, " (", conf.low, ", ", conf.high, ")")) %>% select(Adjusted) %>% add_row(Adjusted = "Reference", .before = 1) %>% add_row(Adjusted = "Reference", .before = 3)
+
+bms <- bm19 %>% mutate(BMIadjusted = str_c(estimate, " (", conf.low, ", ", conf.high, ")")) %>% select(BMIadjusted) %>% add_row(BMIadjusted = "", .before = 1) %>% add_row(BMIadjusted = "", .before = 2) %>% add_row(BMIadjusted = "Reference", .before = 3)
+
+
+table1ESTI <- ums %>% cbind(ams) %>% cbind(bms)
+
+```
+
+```{r}
+table1 <- bind_cols(table1PERC, table1ESTI)
+
+write_xlsx(table1, "O:\\Export\\table1.xlsx")
+```
+
+```{r}
+### bmi subpopulation
+allbmi <- filter(dat19, !is.na(KMI_FOER_1))
+
+dat$bmimiss <- ifelse(is.na(dat$KMI_FOER_1), 1, 0)
+
+dat %>% filter(FAAR_1 > 2009) %>% tabyl(bmimiss)
+
+model <- glm(DIABETES_SVSK_1 ~ newprx_1,
+             family = binomial(link = "logit"),
+             data = allbmi)
+ model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+ 
+ 
+ 
+ 
+model <- glm(DIABETES_SVSK_1 ~ newprx_1 + aldercat + FAAR_1 + MUTD3C,
+             family = binomial(link = "logit"),
+             data = allbmi)
+model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+
+
+
+model <- glm(DIABETES_SVSK_1 ~ newprx_1 + aldercat + FAAR_1 + MUTD3C + KMI_FOER_1,
+             family = binomial(link = "logit"),
+             data = allbmi)
+ model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+
+
+```
+
+```{r}
+### reversed model for association between GDM and HDP, rather than HDP and GDM
+
+n09 <- dat09 %>% tabyl(DIABETES_SVSK_1, newprx_1) 
+p09 <- dat09 %>% tabyl(DIABETES_SVSK_1, newprx_1) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+t09 <- data.frame(N = str_c(n09[,2], " (", p09[,2], ")"))
+s09 <- data.frame(N = str_c(n09[,3], " (", p09[,3], ")"))
+
+r09 <- bind_cols(t09, s09)
+
+n19 <- dat19 %>% tabyl(DIABETES_SVSK_1, newprx_1) 
+p19 <- dat19 %>% tabyl(DIABETES_SVSK_1, newprx_1) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+t19 <- data.frame(N = str_c(n19[,2], " (", p19[,2], ")"))
+s19 <- data.frame(N = str_c(n19[,3], " (", p19[,3], ")"))
+
+r19 <- bind_cols(t19, s19)
+
+table1SUPP <- bind_rows(r09, r19)
+
+
+model <- glm(newprx_1 ~  DIABETES_SVSK_1,
+             family = binomial(link = "log"),
+             data = dat09)
+model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+
+model <- glm(newprx_1 ~  DIABETES_SVSK_1,
+             family = binomial(link = "log"),
+             data = dat19)
+model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+```
+
+### TABLE 2
+
+```{r}
+
+dat$comb_1 <- as.factor(str_c(dat$DIABETES_SVSK_1, dat$newprx_1))
+dat$ant2c <- as.numeric(ifelse(dat$antall > 1, 0, 1))
+
+dat09 <- filter(dat, FAAR_1 < 2010)
+dat19 <- filter(dat, FAAR_1 >= 2010)
+
+
+dat %>% tabyl(comb_1, ant2c) 
+dat %>% tabyl(comb_1, ant2c) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+dat09 <- filter(dat, FAAR_1 < 2010)
+dat19 <- filter(dat, FAAR_1 >= 2010)
+
+n09 <- dat09 %>% tabyl(comb_1, ant2c) 
+p09 <- dat09 %>% tabyl(comb_1, ant2c) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+t09a <- data.frame(N = str_c(n09[,2], " (", p09[,2], ")"))
+t09b <- data.frame(N = str_c(n09[,3], " (", p09[,3], ")"))
+
+r09 <- bind_cols(t09a, t09b)
+
+n19 <- dat19 %>% tabyl(comb_1, ant2c) 
+p19 <- dat19 %>% tabyl(comb_1, ant2c) %>% adorn_percentages("row") %>% adorn_pct_formatting(digits = 1)
+
+t19a <- data.frame(N = str_c(n19[,2], " (", p19[,2], ")"))
+t19b <- data.frame(N = str_c(n19[,3], " (", p19[,3], ")"))
+
+r19 <- bind_cols(t19a, t19b)
+
+table2PERC <- bind_rows(r09, r19)
+
+```
+
+```{r}
+
+model <- glm(ant2c ~ comb_1,
+             family = binomial(link = "logit"),
+             data = dat09)
+um09 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:4) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(ant2c ~ comb_1,
+             family = binomial(link = "logit"),
+             data = dat19)
+um19 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:4) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(ant2c ~ comb_1 + aldercat + FAAR_1 + MUTD3C,
+             family = binomial(link = "logit"),
+             data = dat09)
+am09 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:4) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(ant2c ~ comb_1 + aldercat + FAAR_1 + MUTD3C,
+             family = binomial(link = "logit"),
+             data = dat19)
+am19 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:4) %>% mutate_if(is.numeric, round, digits = 2)
+
+model <- glm(ant2c ~ comb_1 + aldercat + FAAR_1 + MUTD3C + as.numeric(KMI_FOER_1),
+             family = binomial(link = "logit"),
+             data = dat19)
+bm19 <- model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:4) %>% mutate_all(round, digits = 2)
+
+ums <- bind_rows(um09, um19) %>% mutate(Unadjusted = str_c(estimate, " (", conf.low, ", ", conf.high, ")")) %>% select(Unadjusted) %>% add_row(Unadjusted = "Reference", .before = 1) %>% add_row(Unadjusted = "Reference", .before = 5)
+
+ams <- bind_rows(am09, am19) %>% mutate(Adjusted = str_c(estimate, " (", conf.low, ", ", conf.high, ")")) %>% select(Adjusted) %>% add_row(Adjusted = "Reference", .before = 1) %>% add_row(Adjusted = "Reference", .before = 5)
+
+bms <- bm19 %>% mutate(BMIadjusted = str_c(estimate, " (", conf.low, ", ", conf.high, ")")) %>% select(BMIadjusted) %>% add_row(BMIadjusted = "Reference", .before = 1) %>% add_row(BMIadjusted = "", .before = 1) %>% add_row(BMIadjusted = "", .before = 1)%>% add_row(BMIadjusted = "", .before = 1)%>% add_row(BMIadjusted = "", .before = 1)
+
+
+table2ESTI <- ums %>% cbind(ams) %>% cbind(bms)
+
+```
+
+```{r}
+
+### interactive effect
+
+model <- glm(ant2c ~ newprx_1 + DIABETES_SVSK_1 + newprx_1*DIABETES_SVSK_1,
+             family = binomial(link = "logit"),
+             data = dat09)
+model %>% tidy(exponentiate = TRUE) %>% mutate_if(is.numeric, round, digits = 2)
+```
+
+```{r}
+### bmi subpopulation
+allbmi <- filter(dat19, !is.na(KMI_FOER_1))
+
+model <- glm(ant2c ~ comb_1,
+             family = binomial(link = "logit"),
+             data = allbmi)
+ model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+ 
+ 
+ 
+ 
+model <- glm(ant2c ~ comb_1 + aldercat + FAAR_1 + MUTD3C,
+             family = binomial(link = "logit"),
+             data = allbmi)
+model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+
+
+
+model <- glm(ant2c ~ comb_1 + aldercat + FAAR_1 + MUTD3C + KMI_FOER_1,
+             family = binomial(link = "logit"),
+             data = allbmi)
+ model %>% tidy(exponentiate = TRUE, conf.int = TRUE) %>% select(estimate, conf.low, conf.high) %>% slice(2:2) %>% mutate_if(is.numeric, round, digits = 2)
+
+
+
+```
+
+```{r}
+table2 <- bind_cols(table2PERC, table2ESTI)
+
+write_xlsx(table2, "O:\\Export\\table2.xlsx")
+```
+
+### FIGURE 1
+
+```{r}
+
+dat1 <- dat %>% filter(antall == 1)
+dat2 <- dat %>% filter(antall == 2)
+dat3 <- dat %>% filter(antall == 3)
+dat4 <- dat %>% filter(antall == 4)
+
+o1 <- function1(dat1)
+o2 <- function1(dat2)
+o3 <- function1(dat3)
+o4 <- function1(dat4)
+
+
+ggdata <- bind_rows(o1, o2, o3, o4, .id = "parity") %>% mutate(fakeness = str_c(parity, id))
+```
+
+```{r}
+ggplot(data = ggdata)+
+  geom_point(aes(x = birthorder, y = percent*10, group = parity, shape = parity, linetype = parity), size = 3)+
+  geom_line(aes(x = birthorder, y = percent*10, group = parity, linetype = id), linewidth = 1)+
+  ylab("Risk per 1000 births")+
+  xlab("Parity")+
+  facet_grid(cols = vars(id))+
+  scale_linetype_manual(values = c("blank", "blank", "blank", "blank", "solid", "dashed"))+
+  scale_shape_manual(values = c(0,1,2,3), name = "Lifetime Number of Pregnancies")+
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank())
+```
+
+```{r}
+ggsave("O:\\Export\\figure1.jpg", plot = last_plot(), dpi = 300)
+```
+
+## TABLE 3
+
+```{r}
+
+dat$both <- ifelse((dat$newprx_1 == 1 & dat$DIABETES_SVSK_1 == 1) | (dat$newprx_2 == 1 & dat$DIABETES_SVSK_2 == 1 & dat$antall >= 2) | (dat$newprx_3 == 1 & dat$DIABETES_SVSK_3 == 1 & dat$antall >= 3) | (dat$newprx_3 == 1 & dat$DIABETES_SVSK_3 == 1 & dat$antall >= 3) | (dat$newprx_4 == 1 & dat$DIABETES_SVSK_4 == 1 & dat$antall >= 4), 1, 0)
+
+dat$gdmafter <- ifelse((dat$newprx_1 == 1 & (dat$DIABETES_SVSK_2 == 1 | dat$DIABETES_SVSK_3 == 1 | dat$DIABETES_SVSK_4 == 1)) | (dat$newprx_2 == 1 & (dat$DIABETES_SVSK_3 == 1 | dat$DIABETES_SVSK_4 == 1)) | (dat$newprx_3 == 1 & (dat$DIABETES_SVSK_4 == 1)), 1, 0)
+
+dat$prxafter <- ifelse((dat$DIABETES_SVSK_1 == 1 & (dat$newprx_2 == 1 | dat$newprx_3 == 1 | dat$newprx_4 == 1)) | (dat$DIABETES_SVSK_2 == 1 & (dat$newprx_3 == 1 | dat$newprx_4 == 1)) | (dat$DIABETES_SVSK_3 == 1 & (dat$newprx_4 == 1)), 1, 0)
+
+###
+
+
+dat <- dat %>% mutate(frh = case_when(DIABETES_SVSK_1 == 0 & DIABETES_SVSK_after1st == 0 & newprx_1 == 0 & newprx_after_1st == 0 ~ "No complications",
+                                      antall == 1 & (DIABETES_SVSK_1 == 0 & newprx_1 == 1) ~ "1 PRX",
+                                      antall == 1 & (DIABETES_SVSK_1 == 1 & newprx_1 == 0) ~ "1 GDM",
+                                      antall == 1 & (DIABETES_SVSK_1 == 1 & newprx_1 == 1) ~ "1 PRX and GDM",
+                                      antall > 1 & (newprx_after_1st == 1 | newprx_1 == 1)
+                                      & (DIABETES_SVSK_1 == 0 & DIABETES_SVSK_after1st == 0) ~ "2+ PRX only",
+                                      antall > 1 & (newprx_after_1st == 0 & newprx_1 == 0) 
+                                      & (DIABETES_SVSK_1 == 1 | DIABETES_SVSK_after1st == 1) ~  "2+ GDM only", 
+                                      antall > 1 & (gdmafter == 1 & both == 0) ~ "2+ PRX then GDM",
+                                      antall > 1 & (prxafter == 1 & both == 0) ~ "2+ GDM then PRX",
+                                      antall > 1 & (both == 1) ~ "2+ PRX and GDM",
+                                      TRUE ~ "other"
+                                      )) %>% 
+  mutate(frh = fct_rev(as.factor(frh)))
+
+dat09 <- filter(dat, FAAR_1 < 2010)
+dat19 <- filter(dat, FAAR_1 >= 2010)
+
+n09 <- dat09 %>% tabyl(frh)
+n19 <- dat19 %>% tabyl(frh) 
+
+p09 <- dat09 %>% tabyl(frh) %>% adorn_pct_formatting(digits = 2)
+p19 <- dat19 %>% tabyl(frh) %>% adorn_pct_formatting(digits = 2)
+
+t09 <- data.frame(Born1999_2009 = str_c(n09$n, " (", p09$percent, ")"))
+t19 <- data.frame(Born2010_2020 = str_c(n19$n, " (", p19$percent, ")"))
+
+table4_a <- bind_cols(n09$frh, t09, t19)
+
+dat %>% filter(frh == "2+ GDM and HDP sep later") %>% select(newprx_1, newprx_2, newprx_3, newprx_4, DIABETES_SVSK_1, DIABETES_SVSK_2, DIABETES_SVSK_3, DIABETES_SVSK_4)
+
+```
+
+```{r}
+
+write_xlsx(table3, "O:\\Export\\table3.xlsx")
+```
+
+## SUPPLEMENTARY FIGURE 1
+
+```{r}
+### AGE
+
+gdmbyage <- as.data.frame(prop.table(table(dat$DIABETES_SVSK_1, dat$MORS_ALDER_1),2)) %>% filter(Var1 == 1) %>% mutate(id = "GDM")
+
+prxbyage <- as.data.frame(prop.table(table(dat$newprx_1, dat$MORS_ALDER_1),2)) %>% filter(Var1 == 1) %>% mutate(id = "HDP")
+
+freqs <- bind_rows(gdmbyage, prxbyage)
+freqs <- freqs %>% filter(as.numeric(as.character(Var2)) > 19) %>% filter(as.numeric(as.character(Var2)) < 41) %>% mutate(Freq = 1000*round(Freq, 3))
+
+par1 <- ggplot(data = freqs)+
+  geom_line(aes(x = as.numeric(as.character(Var2)), y = Freq, group = id, linetype = id), linewidth = 1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
+  ylab("per 1000 births")+
+  xlab("")+ 
+  theme(legend.position = "none")+
+  ggtitle("First birth")+
+  ylim(0,120)
+
+###
+
+gdmbyage <- as.data.frame(prop.table(table(dat$DIABETES_SVSK_2, dat$MORS_ALDER_2),2)) %>% filter(Var1 == 1) %>% mutate(id = "GDM")
+
+prxbyage <- as.data.frame(prop.table(table(dat$newprx_2, dat$MORS_ALDER_2),2)) %>% filter(Var1 == 1) %>% mutate(id = "HDP")
+
+freqs <- bind_rows(gdmbyage, prxbyage)
+freqs <- freqs %>% filter(as.numeric(as.character(Var2)) > 19) %>% filter(as.numeric(as.character(Var2)) < 41) %>% mutate(Freq = 1000*round(Freq, 3))
+
+par2 <- ggplot(data = freqs)+
+  geom_line(aes(x = as.numeric(as.character(Var2)), y = Freq, group = id, linetype = id), linewidth = 1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
+  ylab("per 1000 births")+
+  xlab("Mother's Age at Birth")+ 
+  theme(legend.position = "none")+
+  ggtitle("Second birth")+
+  ylim(0,120)
+
+###
+
+gdmbyage <- as.data.frame(prop.table(table(dat$DIABETES_SVSK_3, dat$MORS_ALDER_3),2)) %>% filter(Var1 == 1) %>% mutate(id = "GDM")
+
+prxbyage <- as.data.frame(prop.table(table(dat$newprx_3, dat$MORS_ALDER_3),2)) %>% filter(Var1 == 1) %>% mutate(id = "HDP")
+
+freqs <- bind_rows(gdmbyage, prxbyage)
+freqs <- freqs %>% filter(as.numeric(as.character(Var2)) > 19) %>% filter(as.numeric(as.character(Var2)) < 41) %>% mutate(Freq = 1000*round(Freq, 3))
+
+par3 <- ggplot(data = freqs)+
+  geom_line(aes(x = as.numeric(as.character(Var2)), y = Freq, group = id, linetype = id), linewidth = 1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
+  ylab("per 1000 births")+
+  xlab("")+ 
+  ggtitle("Third birth")+
+  ylim(0,120)+
+  theme(legend.position = "none")
+
+
+### YEAR
+
+gdmbyage <- as.data.frame(prop.table(table(dat$DIABETES_SVSK_1, dat$FAAR_1),2)) %>% filter(Var1 == 1) %>% mutate(id = "GDM")
+
+prxbyage <- as.data.frame(prop.table(table(dat$newprx_1, dat$FAAR_1),2)) %>% filter(Var1 == 1) %>% mutate(id = "HDP")
+
+freqs <- bind_rows(gdmbyage, prxbyage)
+freqs <- freqs %>% filter(as.numeric(as.character(Var2)) > 2001) %>% mutate(Freq = 1000*round(Freq, 3))
+
+qar1 <- ggplot(data = freqs)+
+  geom_line(aes(x = as.numeric(as.character(Var2)), y = Freq, group = id, linetype = id), linewidth = 1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
+  ylab("per 1000 births")+
+  xlab("")+ 
+  theme(legend.position = "none")+
+  ggtitle("First birth")+
+  ylim(0,100)
+
+###
+
+gdmbyage <- as.data.frame(prop.table(table(dat$DIABETES_SVSK_2, dat$FAAR_2),2)) %>% filter(Var1 == 1) %>% mutate(id = "GDM")
+
+prxbyage <- as.data.frame(prop.table(table(dat$newprx_2, dat$FAAR_2),2)) %>% filter(Var1 == 1) %>% mutate(id = "HDP")
+
+freqs <- bind_rows(gdmbyage, prxbyage)
+freqs <- freqs %>% filter(as.numeric(as.character(Var2)) > 2001) %>% mutate(Freq = 1000*round(Freq, 3))
+
+qar2 <- ggplot(data = freqs)+
+  geom_line(aes(x = as.numeric(as.character(Var2)), y = Freq, group = id, linetype = id), linewidth = 1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
+  ylab("per 1000 births")+
+  xlab("Year of Birth")+ 
+  theme(legend.position = "none")+
+  ggtitle("Second birth")+
+  ylim(0,100)
+
+###
+
+gdmbyage <- as.data.frame(prop.table(table(dat$DIABETES_SVSK_3, dat$FAAR_3),2)) %>% filter(Var1 == 1) %>% mutate(id = "GDM")
+
+prxbyage <- as.data.frame(prop.table(table(dat$newprx_3, dat$FAAR_3),2)) %>% filter(Var1 == 1) %>% mutate(id = "HDP")
+
+freqs <- bind_rows(gdmbyage, prxbyage)
+freqs <- freqs  %>% filter(as.numeric(as.character(Var2)) > 2001) %>% mutate(Freq = 1000*round(Freq, 3))
+
+qar3 <- ggplot(data = freqs)+
+  geom_line(aes(x = as.numeric(as.character(Var2)), y = Freq, group = id, linetype = id), linewidth = 1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
+  ylab("per 1000 births")+
+  xlab("")+ 
+  theme(legend.position = "none")+
+  ggtitle("Third birth")+
+  ylim(0,100)
+
+###
+
+(qar1 + qar2 + qar3) / (par1 + par2 + par3)
+```
+
+```{r}
+ggsave("O:\\Export\\figure2.jpg", plot = last_plot(), dpi = 300, height = 10, width = 8)
+```
