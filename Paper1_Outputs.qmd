@@ -1,0 +1,863 @@
+
+## SETUP
+
+```{r}
+library(haven)
+library(tidyverse)
+library(finalfit)
+library(survival)
+library(writexl)
+library(gt)
+library(patchwork)
+library(naniar)
+
+```
+
+
+```{r}
+dat <- read_dta(file = "S:\\Project\\HealthierWomen\\Sage\\export2r_24_01_10.dta")
+
+dat <- dat %>% filter(time != 0)
+
+variable.names(dat)
+
+```
+
+```{r}
+
+dat$newprx1 <- ifelse(dat$prxgest_1 != 0, 1, 0)
+
+
+explanatory = c("newprx1", "period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+dat %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p()
+
+
+explanatory = c("newprx_selec", "period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+dat %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p()
+
+```
+
+
+
+```{r}
+dat$period5c_siste <- as.factor(dat$period5c_siste)
+dat$mors_alder_cat <- as.factor(dat$mors_alder_cat)
+dat$MUTD3C <- as.factor(dat$MUTD3C)
+dat$antall3 <- as.factor(dat$antall3)
+dat$prxgest_1 <- as.factor(dat$prxgest_1)
+dat$scen1 <- as.factor(dat$scen1)
+dat$scen2 <- as.factor(dat$scen2)
+dat$newprx_selec <- as.factor(dat$newprx_selec)
+
+```
+
+
+```{r}
+explanatory = c("period5c_siste", "mors_alder_cat", "MUTD3C", "antall3", "PRETERM_selec", "comp_selec")
+dependent = "newprx_selec"
+
+table1 <- dat %>% 
+  summary_factorlist(dependent, explanatory, p = FALSE, add_dependent_label = FALSE) %>% 
+  ff_column_totals(dat, dependent)
+
+print(table1)
+
+write_xlsx(table1, path = "O:\\Export\\table1.xlsx")
+```
+
+### person-years
+
+```{r}
+
+pyall <- pyears(Surv(time,ASCVD_T_69yrs) ~ newprx_selec, data = dat, scale = 1)
+
+summary(pyall)
+
+
+```
+
+
+###Tables
+
+
+
+```{r}
+
+dat1 <- filter(dat, as.numeric(antall3) == 1)
+
+
+explanatory = c("prxgest_1", "period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+dat1 %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> byantall1
+
+byantall1 <- byantall1[1:3,]
+
+py1 <- pyears(Surv(time,ASCVD_T_69yrs) ~ prxgest_1, data = dat1, scale = 1)
+pyd1 <- data.frame(py1$pyears)
+pyd1$event <- py1$event
+pyd1$inc <- (pyd1$event/pyd1$py1.pyears)*100000
+pyd1$CIup <- round((100000/pyd1$py1.pyears)*(pyd1$event+(1.96*sqrt(pyd1$event))), 1)
+pyd1$CIlow <- round((100000/pyd1$py1.pyears)*(pyd1$event-(1.96*sqrt(pyd1$event))), 1)
+
+byantall1 <- bind_cols(byantall1, pyd1$inc, pyd1$CIlow, pyd1$CIup)
+
+###
+
+dat2 <- filter(dat, as.factor(antall3) == 2)
+
+
+explanatory = c("scen1", "period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+dat2 %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> byantall2
+
+byantall2 <- byantall2[1:9,]
+
+py2 <- pyears(Surv(time,ASCVD_T_69yrs) ~ scen1, data = dat2, scale = 1)
+pyd2 <- data.frame(py2$pyears)
+pyd2$event <- py2$event
+pyd2$inc <- (pyd2$event/pyd2$py2.pyears)*100000
+pyd2$CIup <- round((100000/pyd2$py2.pyears)*(pyd2$event+(1.96*sqrt(pyd2$event))), 1)
+pyd2$CIlow <- round((100000/pyd2$py2.pyears)*(pyd2$event-(1.96*sqrt(pyd2$event))), 1)
+
+byantall2 <- bind_cols(byantall2, pyd2$inc, pyd2$CIlow, pyd2$CIup)
+
+###
+
+table2 <- bind_rows(byantall1, byantall2)
+
+print(table2)
+
+write_xlsx(table2, "O:\\Export\\table2.xlsx")
+
+```
+
+### this isn't the same as january_review, which uses a newly generated variable in R called frh
+```{r}
+dat3 <- filter(dat, as.numeric(antall3) > 2)
+
+
+explanatory = c("scen2","period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+dat3 %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table3
+
+py3 <- pyears(Surv(time,ASCVD_T_69yrs) ~ scen2, data = dat3, scale = 1)
+pyd3 <- data.frame(py3$pyears)
+pyd3$event <- py3$event
+pyd3$inc <- (pyd3$event/pyd3$py3.pyears)*100000
+pyd3$CIup <- round((100000/pyd3$py3.pyears)*(pyd3$event+(1.96*sqrt(pyd3$event))), 1)
+pyd3$CIlow <- round((100000/pyd3$py3.pyears)*(pyd3$event-(1.96*sqrt(pyd3$event))), 1)
+
+table3 <- table3[1:18,]
+
+table3 <- bind_cols(table3, pyd3$inc, pyd3$CIlow, pyd3$CIup)
+
+print(table3)
+
+write_xlsx(table3, "O:\\Export\\table3.xlsx")
+
+```
+
+
+### this is how i got the fonts, copy into chunk, takes super long time to load
+
+
+install.packages("Rttf2pt1")
+
+install.packages("extrafont")
+install.packages("extrafontdb")
+library(extrafont)
+library(extrafontdb)
+library(Rttf2pt1)
+font_import()
+
+loadfonts(device = "win")
+
+windowsFonts("Comic Sans" = windowsFont("Comic Sans"))
+
+print(.libPaths())
+
+
+
+
+### Plots
+
+```{r}
+
+library(risks)
+
+dat1 <- filter(dat, as.numeric(antall3) == 1)  
+rd <- riskdiff(formula = ASCVD_T_69yrs ~ prxgest_1, data = dat1)
+
+```
+
+```{r}
+library(epiR)
+
+tmp1 <- as.matrix(cbind(pyd1$event, pyd1$py1.pyears))
+rd1 <- epi.conf(tmp1, ctype= "inc.rate", method = "exact", N = 1000, design = 1, conf.level = 0.95)*100000
+
+tmp2 <- as.matrix(cbind(pyd2$event, pyd2$py2.pyears))
+rd2 <- epi.conf(tmp2, ctype= "inc.rate", method = "exact", N = 1000, design = 1, conf.level = 0.95)*100000
+
+tmp3 <- as.matrix(cbind(pyd3$event, pyd3$py3.pyears))
+rd3 <- epi.conf(tmp3, ctype= "inc.rate", method = "exact", N = 1000, design = 1, conf.level = 0.95)*100000
+
+```
+
+
+
+#### Forest Plot - 2 births 
+
+```{r}
+
+fit <- coxph(Surv(time,ASCVD_T_69yrs) ~ prxgest_1 + period5c_siste + mors_alder_cat + MUTD3C, data = dat1)
+summary(fit)
+
+dazards <- data.frame(exp(fit$coefficients)) %>% head(2) %>%  rownames_to_column("colname") %>% mutate(Var1 = str_c(str_sub(colname, 10), "_1"))
+ci <- data.frame(exp(confint(fit))) %>% head(2) %>% rownames_to_column("colname") %>% dplyr::select(-colname)
+points <- bind_cols(dazards, ci)
+points <- points[,-1]
+print(points)
+
+fake <- data.frame(1.00, "0_1", 1.00, 1.00)
+names(fake) <- variable.names(points)
+
+est1 <- rbind(fake, points)
+est1$Var1 <- fct_inorder(as.factor(est1$Var1))
+
+###
+
+fit <- coxph(Surv(time,ASCVD_T_69yrs) ~ scen1 + period5c_siste + mors_alder_cat + MUTD3C, data = dat2)
+summary(fit)
+
+dazards <- data.frame(exp(fit$coefficients)) %>% head(8) %>%  rownames_to_column("colname") %>% mutate(Var1 = str_c(str_sub(colname, 6), "_2"))
+ci <- data.frame(exp(confint(fit))) %>% head(8) %>% rownames_to_column("colname") %>% dplyr::select(-colname)
+points <- bind_cols(dazards, ci)
+points <- points[,-1]
+print(points)
+
+fake <- data.frame(1.00, "0_2", 1.00, 1.00)
+names(fake) <- variable.names(points)
+
+est2 <- rbind(fake, points)
+est2$Var1 <- fct_inorder(as.factor(est2$Var1))
+
+estimates <- rbind(est1, est2)
+
+forest2 <- bind_cols(estimates, table2[,5:8])
+
+## this has trouble sometimes of whether it should be py1.pyears /py2.pyears or just pyears
+
+tmp1 <- as.matrix(cbind(pyd1$event, pyd1$py1.pyears))
+rd1 <- epi.conf(tmp1, ctype= "inc.rate", method = "exact", N = 1000, design = 1, conf.level = 0.95)*100000
+
+tmp2 <- as.matrix(cbind(pyd2$event, pyd2$py2.pyears))
+rd2 <- epi.conf(tmp2, ctype= "inc.rate", method = "exact", N = 1000, design = 1, conf.level = 0.95)*100000
+
+rd12 <- bind_rows(rd1, rd2)
+
+rd12 <- format(round(rd12, 1), nsmall = 1)
+
+forest2$rd <- str_c(rd12$est, " (", rd12$lower, ", ", rd12$upper, ")")
+
+forest2$...6 <- round(forest2$...6, 1)
+forest2$riskCI <- str_c(forest2$...6, " (", forest2$...7, ", ", forest2$...8, ")")
+
+
+names(forest2)[5] <- "model"
+
+forest2$model <- gsub("-(?!\\d|\\w)", "1.00 (Reference)", forest2$model, perl = TRUE)
+forest2$model <- gsub("0.00 \\(0.00-Inf\\)", "NA", forest2$model)
+forest2$model <- gsub("-", ", ", forest2$model, perl = TRUE)
+forest2$rd <- gsub("\\( ", "\\(", forest2$rd)
+
+forest2$unadjusted <- table2[,4]
+forest2$unadjusted <- gsub("-", ", ", forest2$unadjusted, perl = TRUE)
+forest2$unadjusted[forest2$unadjusted == ", "] <- "1.00 (Reference)"
+
+dat2$hdpscen1 <- ifelse(dat2$newprx_selec == 1, as.factor(dat2$scen1), NA)
+percentages1 <- data.frame(prop.table(table(dat2$hdpscen1)))
+percentages1$Freq <- format(round(percentages1$Freq*100, 1), nsmall = 1)
+percentages1$Freq <- as.character(percentages1$Freq)
+fake <- data.frame(as.factor(1), "100")
+names(fake) <- variable.names(percentages1)
+percentages <- bind_rows(fake, percentages1)
+numbers1 <- data.frame(table(dat2$scen1))
+numbers1$Freq <- ifelse(numbers1$Freq > 9999, formatC(numbers1$Freq, big.mark = ",", big.interval = 3L), numbers1$Freq) ## this is new
+numper2 <- bind_cols(percentages, numbers1)
+numper2$nice1 <- str_c(numper2$Freq...4, " (", numper2$Freq...2, "%",")")
+numper2$nice1 <- gsub("\\( ", "\\(", numper2$nice1)
+
+###
+
+dat1$hdpprxgest_1 <- ifelse(dat1$newprx_selec == 1, as.factor(dat1$prxgest_1), NA)
+percentages1 <- data.frame(prop.table(table(dat1$hdpprxgest_1)))
+percentages1$Freq <- format(round(percentages1$Freq*100, 1), nsmall = 1)
+percentages1$Freq <- as.character(percentages1$Freq)
+fake <- data.frame(as.factor(1), "100")
+names(fake) <- variable.names(percentages1)
+percentages <- bind_rows(fake, percentages1)
+numbers1 <- data.frame(table(dat1$prxgest_1))
+numbers1$Freq <- ifelse(numbers1$Freq > 9999, formatC(numbers1$Freq, big.mark = ",", big.interval = 3L), numbers1$Freq) ## this is new
+numper1 <- bind_cols(percentages, numbers1)
+numper1$nice1 <- str_c(numper1$Freq...4, " (", numper1$Freq...2,"%",")")
+
+###
+
+freq <- bind_rows(numper1, numper2) %>% select(nice1)
+freq <- bind_cols(freq, forest2$Var1) 
+freq <- freq %>% rename("Var1" = "...2")
+freq$nice1 <- str_replace(freq$nice1, "\\(100%\\)", "")
+
+###
+
+text <- data.frame(Var1 = forest2$Var1, hdp1 = c("", "", "", "No HDP", "Term HDP", "Preterm HDP", "No HDP", "Term HDP", "Preterm HDP", "No HDP", "Term HDP", "Preterm HDP"), hdp2 = c("No HDP", "Term HDP", "Preterm HDP","No HDP", "", "", "Term HDP", "", "", "Preterm HDP", "", ""))
+
+```
+
+##### plots
+```{r}
+rd <- forest2 %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 0,label = rd), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold"))+
+  ggtitle("Mortality Rate")
+  
+risk <- forest2 %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = model), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold"))+
+  ggtitle("Adjusted\nHR (95%CI)")
+
+unadj <- forest2 %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = unadjusted), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold"))+
+  ggtitle("Unadjusted\nHR (95%CI)")
+
+number <- freq %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = nice1), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold"))+
+  ggtitle("N (Percent of\nmothers \nwith HDP)")
+
+label2 <- text %>% 
+  ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = hdp2), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold"))+
+  ggtitle("1st Birth")
+  
+label1 <- text %>% 
+  ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = hdp1), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold"))+
+  ggtitle("2nd Birth")
+
+trees <- forest2 %>% 
+  ggplot(aes(y = fct_rev(Var1)))+
+  geom_point(aes(x = exp.fit.coefficients.))+
+  geom_linerange(aes(xmin = X2.5.., xmax = X97.5..))+
+  scale_x_continuous(trans="log10", position="bottom", breaks = c(1, 2, 10), limits = c(0.3, 40))+
+  theme_classic()+
+  geom_vline(xintercept = 1, linetype = "dashed")+
+  theme(axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold")
+        )+
+  ggtitle("")+
+  labs(x = "Adjusted HR (95% CI)\nof CVD mortality")
+##, panel.border = element_rect(color = "black", fill = NA, size = 1)
+
+layout <- c(
+  area(t=0, l=1, b=30, r= 3),
+  area(t=0, l=4, b=30, r= 6),
+  area(t=0, l=7, b=30, r= 9),
+  area(t=0, l=10, b = 30, r = 12),
+  area(t=0, l=12, b = 30, r = 16),
+  area(t = 0, l = 16, b = 30, r = 18),
+  area(t = 0, l = 19, b = 30, r = 23)
+)
+
+label2 + label1 + number + rd + unadj + risk + trees + plot_layout(design = layout)
+
+ggsave("O:\\Export\\Figure1.png", plot = last_plot(), dpi = 500, width = 12, height = 5)
+
+```
+
+
+#### Forest Plot - 3 or more births
+
+```{r}
+
+fit <- coxph(Surv(time,ASCVD_T_69yrs) ~ scen2 + period5c_siste + mors_alder_cat + MUTD3C, data = dat3)
+summary(fit)
+
+dazards <- data.frame(exp(fit$coefficients)) %>% head(17) %>%  rownames_to_column("colname") %>% mutate(Var1 = str_sub(colname, 6))
+ci <- data.frame(exp(confint(fit))) %>% head(17) %>% rownames_to_column("colname") %>% dplyr::select(-colname)
+points <- bind_cols(dazards, ci)
+points <- points[,-1]
+print(points)
+
+fake <- data.frame(1.00, "0", 1.00, 1.00)
+names(fake) <- variable.names(points)
+
+forest3 <- rbind(points, fake)
+
+est3 <- rbind(fake, points)
+est3$Var1 <- fct_inorder(as.factor(est3$Var1))
+
+###
+
+forest3 <- bind_cols(est3, table3[,5:8])
+
+tmp3 <- as.matrix(cbind(pyd3$event, pyd3$py3.pyears))
+rd3 <- epi.conf(tmp3, ctype= "inc.rate", method = "exact", N = 1000, design = 1, conf.level = 0.95)*100000
+rd3 <- format(round(rd3, 1), nsmall = 1)
+forest3$rd <- str_c(rd3$est, " (", rd3$lower, ", ", rd3$upper, ")")
+
+forest3$...6 <- round(forest3$...6, 1)
+forest3$riskCI <- str_c(forest3$...6, " (", forest3$...7, ", ", forest3$...8, ")")
+
+forest3$unadjusted <- table3[,4]
+forest3$unadjusted <- gsub("-", ", ", forest3$unadjusted, perl = TRUE)
+forest3$unadjusted[forest3$unadjusted == ", "] <- "1.00 (Reference)"
+forest3$unadjusted <- gsub("0.00 \\(0.00, Inf\\)", "NA", forest3$unadjusted)
+
+
+names(forest3)[5] <- "model"
+
+forest3 <- forest3 %>% replace_with_na_at(.vars = c("exp.fit.coefficients.", "X2.5..", "X97.5.."),
+                                          condition = ~.x < 0.0001)
+forest3$model <- gsub("-(?!\\d|\\w)", "1.00 (Reference)", forest3$model, perl = TRUE)
+forest3$model <- gsub("0.00 \\(0.00-Inf\\)", "NA", forest3$model)
+forest3$model <- gsub("-", ", ", forest3$model, perl = TRUE)
+
+forest3$rd <- gsub("0.0 \\( 0.0, 171.0\\)", "0", forest3$rd)
+forest3$rd <- gsub("0.0 \\( 0.0, 175.5\\)", "0", forest3$rd)
+forest3$rd <- gsub("\\( ", "\\(", forest3$rd)
+
+
+###
+
+dat3$hdpscen2 <- ifelse(dat3$newprx_selec == 1, as.factor(dat3$scen2), NA)
+percentages1 <- data.frame(prop.table(table(dat3$hdpscen2)))
+percentages1$Freq <- format(round(percentages1$Freq*100, 1), nsmall = 1)
+percentages1$Freq <- as.character(percentages1$Freq)
+fake <- data.frame(as.factor(1), "100")
+names(fake) <- variable.names(percentages1)
+percentages <- bind_rows(fake, percentages1)
+numbers1 <- data.frame(table(dat3$scen2))
+numbers1$Freq <- ifelse(numbers1$Freq > 9999, formatC(numbers1$Freq, big.mark = ",", big.interval = 3L), numbers1$Freq) ## this is new
+numper2 <- bind_cols(percentages, numbers1) %>% select(-Var1...3, -Var1...1)
+numper2$nice1 <- str_c(numper2$Freq...4, " (", numper2$Freq...2, "%",")")
+numper2$nice1 <- gsub("\\( ", "\\(", numper2$nice1)
+
+###
+
+freq <- bind_cols(numper2, forest3$Var1) 
+freq <- freq %>% rename("Var1" = "...4")
+freq$nice1 <- str_replace(freq$nice1, "\\(100%\\)", "")
+
+###
+
+text <- data.frame(Var1 = forest3$Var1, hdp1 = c("No HDP", "", "", "", "", "", "Term HDP", "", "", "", "", "", "Preterm HDP", "", "", "", "", ""), hdp2 = c("No HDP", "", "Term HDP", "", "Preterm HDP", ""), hdp3 = c("No Later HDP", "Later HDP"))
+
+```
+
+##### plots
+```{r}
+
+rd <- forest3 %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 0,label = rd), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5),
+        text = element_text(family = "Calibri", face = "bold"))+
+  ggtitle("Death per \n100,000\nperson-years")
+  
+risk <- forest3 %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = model), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        text = element_text(family = "Calibri"))+
+  ggtitle("Adjusted\nHR (95%CI)")
+
+unadj <- forest3 %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = unadjusted), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        text = element_text(family = "Calibri"))+
+  ggtitle("Unadjusted\nHR (95%CI)")
+
+
+number <- freq %>% 
+ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = nice1), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        text = element_text(family = "Calibri"))+
+  ggtitle("N (Percent of\nmothers \nwith HDP)")
+
+label2 <- text %>% 
+  ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = hdp2), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        text = element_text(family = "Calibri"))+
+  ggtitle("2nd birth")
+  
+label1 <- text %>% 
+  ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = hdp1), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        text = element_text(family = "Calibri"))+
+  ggtitle("1st birth")
+
+label3 <- text %>% 
+  ggplot(aes(y = fct_rev(Var1)))+
+  geom_text(aes(x = 1,label = hdp3), family = "Calibri")+
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        text = element_text(family = "Calibri"))+
+  ggtitle("Later births")
+
+trees <- forest3 %>% 
+  ggplot(aes(y = fct_rev(Var1)))+
+  geom_point(aes(x = exp.fit.coefficients.))+
+  geom_linerange(aes(xmin = X2.5.., xmax = X97.5..))+
+  scale_x_continuous(trans="log10", position="bottom", breaks = c(1, 2, 10), limits = c(0.3, 40))+
+  theme_classic()+
+  geom_vline(xintercept = 1, linetype = "dashed")+
+  ggtitle("")+
+  labs(x = "Adjusted HR (95% CI)\nof CVD mortality")+
+  theme(axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        text = element_text(family = "Calibri", face = "bold")
+        )
+  
+##, panel.border = element_rect(color = "black", fill = NA, size = 1)
+
+layout <- c(
+  area(t=0, l=0, b=30, r= 2),
+  area(t=0, l=3, b=30, r= 5),
+  area(t=0, l=6, b=30, r= 8),
+  area(t=0, l=9, b=30, r= 11),
+  area(t=0, l=12, b = 30, r = 15),
+  area(t = 0, l = 16, b = 30, r = 18),
+  area(t = 0, l = 19, b = 30, r = 21),
+  area(t = 0, l = 22, b = 30, r = 26)
+)
+
+label1 + label2 + label3 + number + rd + unadj + risk + trees + plot_layout(design = layout)
+
+
+ggsave("O:\\Export\\Figure2.png", plot = last_plot(), dpi = 500, width = 12, height = 5)
+
+```
+
+## final table
+```{r}
+explanatory = c("liv", "period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+dat %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> tablesumm
+
+tablesumm <- tablesumm[1:4,]
+
+print(tablesumm)
+
+
+write_xlsx(tablesumm, "O:\\Export\\tablesumm.xlsx")
+
+```
+
+
+
+
+
+
+
+
+## Supplementary 1
+
+```{r}
+
+dat$rFDATO_siste <- ymd_hms(dat$FDATO_siste)
+dat$rFDATO_2siste <- ymd_hms(dat$FDATO_2siste)
+
+dat$rFDATO_siste <- as_date(dat$FDATO_siste)
+dat$rFDATO_2siste <- as_date(dat$FDATO_2siste)
+
+dat <- dat %>% 
+  mutate(conception = rFDATO_siste - GEST_siste) %>% 
+  mutate(int_siste = conception - rFDATO_2siste)
+
+dat <- dat %>% 
+  mutate(conception = rFDATO_siste - GEST_siste) %>% 
+  mutate(int_siste = conception - rFDATO_2siste)
+
+
+dat$int_siste <- cut(as.numeric(dat$int_siste), breaks = c(0, 730, 1825, 999999), labels = c("short", "medium", "long")) 
+
+```
+
+
+```{r}
+
+datmagic <- dat %>% filter(scen2 == 100 | scen2 == 0) %>% filter(antall3 != 1)
+
+
+explanatory = c("type","period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4a
+
+table4a <- table4a[1:4,]
+
+###
+
+datmagic$compo <- str_c(datmagic$scen2, datmagic$comp_selec, sep = "_")
+
+explanatory = c("compo","period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4b
+
+table4b <- table4b[-c(2),]
+table4b <- table4b[1:3,]
+
+
+###
+datmagic$prtonly <- str_c(datmagic$scen1, datmagic$PRETERM1, sep = "_")
+datmagic$prtonly <- str_c(datmagic$prtonly, datmagic$PRETERM2, sep = "_")
+
+explanatory = c("prtonly","period5c_siste","mors_alder_cat","MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4c
+table4c <- table4c[-c(2,3,4),]
+table4c <- table4c[1:3,]
+
+######
+
+datmagic$inthis <- str_c(datmagic$scen2, datmagic$int_siste, sep = "_")
+datmagic$inthis <- relevel(as.factor(datmagic$inthis), ref = "0_medium")
+
+explanatory = c("inthis","period5c_siste","mors_alder_cat","MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4e
+table4e <- table4e[1:6,]
+
+print(table4e)
+
+######
+
+table41 <- bind_rows(table4a, table4b, table4c, table4e)
+
+print(table41)
+
+
+write_xlsx(table41, "O:\\Export\\table41.xlsx")
+
+```
+
+```{r}
+
+pycompo <- pyears(Surv(time,ASCVD_T_69yrs) ~ compo, data = datmagic, scale = 1)
+
+summary(pycompo)
+
+pyc1 <- data.frame(pycompo$pyears)
+pyc1$event <- pycompo$event
+pyc1$inc <- (pyc1$event/pyc1$pycompo.pyears)*100000
+
+
+```
+
+
+```{r}
+
+datmagic <- dat %>% filter(scen1 == 10 | scen1 == 0) %>% filter(antall3 == 2)
+
+
+explanatory = c("type","period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4a
+
+table4a <- table4a[1:4,]
+
+###
+
+datmagic$compo <- str_c(datmagic$scen1, datmagic$comp_selec, sep = "_")
+
+explanatory = c("compo","period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4b
+
+table4b <- table4b[-c(2),]
+table4b <- table4b[1:3,]
+
+
+###
+datmagic$prtonly <- str_c(datmagic$scen1, datmagic$PRETERM1, sep = "_")
+datmagic$prtonly <- str_c(datmagic$prtonly, datmagic$PRETERM2, sep = "_")
+
+explanatory = c("prtonly","period5c_siste","mors_alder_cat","MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4c
+table4c <- table4c[-c(2,3,4),]
+table4c <- table4c[1:3,]
+
+
+######
+datmagic$inthis <- str_c(datmagic$scen2, datmagic$int_siste, sep = "_")
+datmagic$inthis <- relevel(as.factor(datmagic$inthis), ref = "0_medium")
+
+explanatory = c("inthis","period5c_siste","mors_alder_cat","MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4e
+table4e <- table4e[1:6,]
+
+print(table4e)
+
+######
+
+table42 <- bind_rows(table4a, table4b, table4c, table4e)
+
+print(table42)
+
+
+write_xlsx(table42, "O:\\Export\\table42.xlsx")
+
+```
+
+
+
+```{r}
+
+datmagic <- dat %>% filter(scen2 == 100 | scen2 == 0) %>% filter(antall3 == 3)
+
+
+explanatory = c("type","period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4a
+
+table4a <- table4a[1:4,]
+
+###
+
+datmagic$compo <- str_c(datmagic$scen1, datmagic$comp_selec, sep = "_")
+
+explanatory = c("compo","period5c_siste", "mors_alder_cat", "MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4b
+
+table4b <- table4b[-c(2),]
+table4b <- table4b[1:3,]
+
+
+###
+datmagic$prtonly <- str_c(datmagic$scen1, datmagic$PRETERM1, sep = "_")
+datmagic$prtonly <- str_c(datmagic$prtonly, datmagic$PRETERM2, sep = "_")
+
+explanatory = c("prtonly","period5c_siste","mors_alder_cat","MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4c
+table4c <- table4c[-c(2,3,4),]
+table4c <- table4c[1:3,]
+
+
+######
+datmagic$inthis <- str_c(datmagic$scen2, datmagic$int_siste, sep = "_")
+datmagic$inthis <- relevel(as.factor(datmagic$inthis), ref = "0_medium")
+
+explanatory = c("inthis","period5c_siste","mors_alder_cat","MUTD3C")
+dependent = "Surv(time,ASCVD_T_69yrs)"
+
+datmagic %>% 
+  finalfit(dependent, explanatory) %>% 
+  ff_remove_p() -> table4e
+table4e <- table4e[1:6,]
+
+print(table4e)
+
+######
+
+table43 <- bind_rows(table4a, table4b, table4c, table4e)
+
+print(table43)
+
+write_xlsx(table43, "O:\\Export\\table43.xlsx")
+
+```
+
+
