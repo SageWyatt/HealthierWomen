@@ -1,18 +1,18 @@
 /// Data import and cleaning
 
-use "S:\Project\HealthierWomen\Sage\MFR_SIBS_19_08_21_v5_Copy.dta"
+use "S:\Project\HealthierWomen\Files\SageFinalFiles\RawWideFile.dta"
 ** ^^^this is a sibship file
 gen week16antall = antall
 
 keep mor_dalder ASCVD_T MOR_FAAR mors_alder_siste PARITET_MOR_1 mor_dalder mor_lnr MUTD3C MORS_ALDER_1 week16antall 
 
-save "S:\Project\HealthierWomen\Sage\MFR_SIBS_19_08_21_v5_cvdonly.dta", replace
+save "S:\Project\HealthierWomen\Files\SageFinalFiles\CVDdata.dta", replace
 
 clear all
 
 ///
 
-import spss BARN_lnr MOR_lnr FAAR PLUR2C PARITET_MOR FAAR SVLEN_RS PRETERM preecxx HYPERTENSJON_ALENE Z DIABETES_MELLITUS FSTART MORS_ALDER using "S:\Project\HealthierWomen\Sage\MFR_CROSS_BARN_DOD_14_10_21_v5_1.sav"
+import spss BARN_lnr MOR_lnr FAAR PLUR2C PARITET_MOR FAAR SVLEN_RS PRETERM preecxx HYPERTENSJON_ALENE Z DIABETES_MELLITUS FSTART MORS_ALDER using "S:\Project\HealthierWomen\Files\SageFinalFiles\RawLongFile.sav"
 ** ^^ this is a cross-sectional file
 
 drop if SVLEN_RS < 20
@@ -38,7 +38,7 @@ reshape wide antall BARN_lnr PLUR2C PARITET_MOR FAAR SVLEN_RS PRETERM preecxx HY
 
 gen mor_lnr = MOR_lnr
 
-joinby mor_lnr using "S:\Project\HealthierWomen\Sage\MFR_SIBS_19_08_21_v5_cvdonly.dta", unmatched(master)
+joinby mor_lnr using "S:\Project\HealthierWomen\Files\SageFinalFiles\CVDdata.dta", unmatched(master)
 
 gen antall = antall_1
 
@@ -120,7 +120,7 @@ replace faarcat = 2011 if FAAR_1 >= 2000
 
 /// Cause-specific risk model setup
 
-joinby MOR_lnr using "S:\Project\HealthierWomen\Files\For Sage\liv_emigration_FINAL_nulliparous.dta", unmatched(master)
+joinby MOR_lnr using "S:\Project\HealthierWomen\Files\SageFinalFiles\EmigrationData.dta", unmatched(master)
 **^^ this contains information on emigration, regstatus2020_REG
 
 gen ascvd_sens = .
@@ -266,7 +266,7 @@ stptime, by(ght2c)
 
 keep mor_lnr SVLEN_RS_1 PRETERM_1 newprx_1 Z_1 ASCVD_T_69yrs ascvd_sens_69 FAAR_1 MORS_ALDER_1 MUTD3C firstbirth Antall_barn2cx cr_time event_type mord69
 
-save "S:\Project\HealthierWomen\Sage\Daily Rmd Files\paper2review_24_08_07.dta", replace
+save "S:\Project\HealthierWomen\Files\SageFinalFiles\Paper2CleanFile.dta", replace
 
 clear all
 
