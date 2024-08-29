@@ -1,6 +1,6 @@
 /// Data import and cleaning
 
-use "S:\Project\HealthierWomen\Files\SageFinalFiles\Paper1RawWide.dta"
+use "S:\Project\HealthierWomen\Files\SageFinalFiles\RawWideFile.dta"
 ** ^^^this is a sibship file
 gen week16antall = antall
 
@@ -12,7 +12,7 @@ clear all
 
 ////
 
-import spss BARN_lnr MOR_lnr FAAR PLUR2C preecxx HYPERTENSJON_ALENE SVLEN_RS PRETERM FSTART ABRUPTIOP sga_10 DIABETES_SVSK PDOD EKLAMPSI HELLP FDATO SVLEN_DG PREEKL HYPERTENSJON_KRONISK DIABETES_MELLITUS using "S:\Project\HealthierWomen\Files\SageFinalFiles\Paper1RawLong.sav"
+import spss BARN_lnr MOR_lnr FAAR PLUR2C preecxx HYPERTENSJON_ALENE SVLEN_RS PRETERM FSTART ABRUPTIOP sga_10 DIABETES_SVSK PDOD EKLAMPSI HELLP FDATO SVLEN_DG PREEKL HYPERTENSJON_KRONISK DIABETES_MELLITUS using "S:\Project\HealthierWomen\Files\SageFinalFiles\RawLongFile.sav"
 ** ^^^this is a cross-sectional file
 
 drop if SVLEN_RS < 20
