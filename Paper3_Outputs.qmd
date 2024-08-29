@@ -19,10 +19,10 @@ library(fixest)
 library(sandwich)
 library(writexl)
 
-widefilefilters <- read_dta("S:\\Project\\HealthierWomen\\Sage\\widefilefilters.dta") %>% select(-FAAR_1)
-education <- read_sav("S:\\Project\\HealthierWomen\\Sage\\MFR_SIBS_19_08_21_v5_edu.sav") %>% filter(!is.na(mor_lnr))
-dat <- read_dta("S:\\Project\\HealthierWomen\\Sage\\paper3vars_24_06_18.dta")
-bmistuff <- read_dta("S:\\Project\\HealthierWomen\\Sage\\MFR_SIBS_19_08_21_v5_bmistuff.dta") %>% filter(!is.na(mor_lnr))
+widefilefilters <- read_dta("S:\\Project\\HealthierWomen\\Files\\SageFinalFiles\\Paper3FileA.dta") %>% select(-FAAR_1)
+education <- read_sav("S:\\Project\\HealthierWomen\\Files\\SageFinalFiles\\EducationData.sav") %>% filter(!is.na(mor_lnr))
+dat <- read_dta("S:\\Project\\HealthierWomen\\Files\\SageFinalFiles\\Paper3FileB.dta")
+bmistuff <- read_dta("S:\\Project\\HealthierWomen\\Files\\SageFinalFiles\\BMIdata.dta") %>% filter(!is.na(mor_lnr))
 
 
 
