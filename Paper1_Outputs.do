@@ -1,12 +1,12 @@
 /// Data import and cleaning
 
-use "S:\Project\HealthierWomen\Sage\MFR_SIBS_19_08_21_v5_Copy.dta"
+use "S:\Project\HealthierWomen\Files\SageFinalFiles\Paper1RawFile.dta"
 ** ^^^this is a sibship file
 gen week16antall = antall
 
 keep mor_dalder ASCVD_T MOR_FAAR mors_alder_siste PARITET_MOR_1 mor_dalder mor_lnr MUTD3C MORS_ALDER_1 week16antall 
 
-save "S:\Project\HealthierWomen\Sage\MFR_SIBS_19_08_21_v5_cvdonly.dta", replace
+save "S:\Project\HealthierWomen\Files\SageFinalFiles\CVDdata.dta", replace
 
 clear all
 
@@ -33,7 +33,7 @@ reshape wide BARN_lnr FAAR PLUR2C preecxx HYPERTENSJON_ALENE SVLEN_RS antall PRE
 
 gen mor_lnr = MOR_lnr
 
-joinby mor_lnr using "S:\Project\HealthierWomen\Sage\MFR_SIBS_19_08_21_v5_cvdonly.dta", unmatched(master)
+joinby mor_lnr using "S:\Project\HealthierWomen\Files\SageFinalFiles\CVDdata.dta", unmatched(master)
 
 drop antall3
 	gen antall3 = antall1
@@ -309,7 +309,7 @@ replace DIABETES_FOR2C1 = 1 if DIABETES_MELLITUS1 == 1 | DIABETES_MELLITUS1 == 2
 
 drop _merge
 
-joinby MOR_lnr using "S:\Project\HealthierWomen\Files\For Sage\liv_emigration_FINAL_nulliparous.dta", unmatched(master)
+joinby MOR_lnr using "S:\Project\HealthierWomen\Files\SageFinalFiles\EmigrationData.dta", unmatched(master)
 **^^ this contains information on emigration, regstatus2020_REG
 
 gen time = ascvd_sens_69 - mors_alder_siste
@@ -342,7 +342,7 @@ replace ascvd_sens_69 = age_followUpEnd if regstatus2020_REG == 3
 
 keep mor_lnr prxgest_1 scen1 scen2 time period5c_siste mors_alder_cat MUTD3C antall3 ASCVD_T_69yrs FSTART1 FSTART2 FSTART3 FSTART4 FSTART5 FSTART6 FSTART7 FSTART8 comp_selec newprx_selec PRETERM_selec liv type PRETERM1 PRETERM2 GEST_siste FDATO_siste FDATO_2siste HYPERTENSJON_KRONISK1 DIABETES_FOR2C1
 
-save "S:\\Project\\HealthierWomen\\Sage\\export2r_24_01_10.dta", replace
+save "S:\Project\HealthierWomen\Files\SageFinalFiles\Paper1CleanFile.dta", replace
 
 clear all
 
