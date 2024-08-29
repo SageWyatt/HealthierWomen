@@ -15,7 +15,7 @@ library(naniar)
 
 
 ```{r}
-dat <- read_dta(file = "S:\\Project\\HealthierWomen\\Sage\\export2r_24_01_10.dta")
+dat <- read_dta(file = "S:\\Project\\HealthierWomen\\Files\\SageFinalFiles\\Paper1CleanFile.dta")
 
 dat <- dat %>% filter(time != 0)
 
