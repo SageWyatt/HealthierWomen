@@ -16,7 +16,7 @@ library(cmprsk)
 ```
 
 ```{r}
-dat <- read_dta("S:\\Project\\HealthierWomen\\Sage\\Daily Rmd Files\\paper2roughdraft_export2r_24_03_08.dta")
+dat <- read_dta("S:\\Project\\HealthierWomen\\Files\\SageFinalFiles\\Paper2CleanFile.dta")
 
 variable.names(dat)
 dat$perc <- 100*pnorm(dat$Z_1)
